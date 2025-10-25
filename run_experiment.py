@@ -44,7 +44,8 @@ def predict_masks(model_path: str, image_dir: str, output_dir: str, input_size=(
     )
 
     # Load trained weights
-    model.load_state_dict(torch.load(model_path, map_location="cpu"))
+    checkpoint = torch.load(model_path, map_location="cpu")
+    model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
@@ -85,7 +86,7 @@ def predict_masks(model_path: str, image_dir: str, output_dir: str, input_size=(
             pred = model(x)
             pred = torch.sigmoid(pred).squeeze().cpu().numpy()
 
-        # Resize mask back to original size and binarize
+        # Resize mask back to original size with bilinear interpolation and binarize
         mask_resized = cv2.resize(pred, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
         mask_binary = (mask_resized > 0.5).astype(np.uint8)
 
