@@ -12,7 +12,7 @@ import os
 import json
 import argparse
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 import torch
 import segmentation_models_pytorch as smp
 from albumentations.pytorch import ToTensorV2
@@ -20,8 +20,10 @@ import albumentations as A
 import numpy as np
 from pathlib import Path
 import cv2
+import matplotlib.pyplot as plt
+import networkx as nx
 
-def predict_masks(model_path: str, image_dir: str, output_dir: str, input_size=(256, 256)):
+def predict_masks(model_path: str, image_dir: str, provided_masks_dir: str, predicted_masks_dir: str, input_size=(256, 256)):
     """
     Predict binary masks for unlabeled images using the trained model.
 
@@ -58,15 +60,15 @@ def predict_masks(model_path: str, image_dir: str, output_dir: str, input_size=(
     ])
 
     # Ensure output directory exists
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(predicted_masks_dir, exist_ok=True)
 
     image_dir = Path(image_dir)
-    output_dir = Path(output_dir)
+    provided_masks_dir = Path(provided_masks_dir)
+    predicted_masks_dir = Path(predicted_masks_dir)
 
     # Identify unlabeled images (no existing mask in ../data/masks/)
     all_images = sorted(list(image_dir.glob("*.jpg")))
-    masks_dir = image_dir.parent / "masks"
-    unlabeled_images = [p for p in all_images if not (masks_dir / f"{p.stem}_mask.png").exists()]
+    unlabeled_images = [p for p in all_images if not (provided_masks_dir / f"{p.stem}_mask.png").exists()]
 
     print(f"Found {len(unlabeled_images)} unlabeled images.")
 
@@ -91,34 +93,155 @@ def predict_masks(model_path: str, image_dir: str, output_dir: str, input_size=(
         mask_binary = (mask_resized > 0.5).astype(np.uint8)
 
         # Save as PNG (0/255)
-        out_path = output_dir / f"{img_path.stem}_mask.png"
+        out_path = predicted_masks_dir / f"{img_path.stem}_mask.png"
         cv2.imwrite(str(out_path), mask_binary * 255)
 
         print(f"[{i}/{len(unlabeled_images)}] Saved: {out_path.name}")
 
     print("Mask prediction complete!")
 
-def extract_features(image_dir: str, mask_dir: str) -> Dict[str, dict]:
-    """Extract geometric and texture features for each puzzle piece."""
+def extract_features(image_dir: str, provided_masks_dir: str, predicted_masks_dir: str) -> Dict[str, dict]:
+    """
+    Extract geometric and texture features for each puzzle piece.
+    Returns dict: piece_id -> features
+    """
     print("Extracting features from puzzle pieces...")
-    # TODO: Compute descriptors, corners, edge embeddings, etc.
     features = {}
-    # Example:
-    # for mask_path in Path(mask_dir).glob("*_mask.png"):
-    #     features[mask_path.stem.replace('_mask','')] = compute_piece_features(mask_path)
-    print("Feature extraction complete.")
+
+    image_dir = Path(image_dir)
+    provided_masks_dir = Path(provided_masks_dir)
+    predicted_masks_dir = Path(predicted_masks_dir)
+
+    all_images = sorted(list(image_dir.glob("*.jpg")))
+
+    for img_path in all_images:
+        img = cv2.imread(str(img_path))
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        # Select mask
+        mask_path = provided_masks_dir / f"{img_path.stem}_mask.png"
+        if not mask_path.exists():
+            mask_path = predicted_masks_dir / f"{img_path.stem}_mask.png"
+
+        mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+        mask_bin = (mask > 127).astype(np.uint8)
+
+        # Contour extraction
+        contours, _ = cv2.findContours(mask_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if len(contours) == 0:
+            continue
+        contour = max(contours, key=cv2.contourArea)
+
+        # Polygon approximation
+        epsilon = 0.01 * cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, epsilon, True)
+        approx = approx.reshape(-1, 2)
+
+        # Rotated rectangle for edge sides
+        rect = cv2.minAreaRect(contour)
+        box = cv2.boxPoints(rect).astype(int)
+
+        # Count flat edges
+        flat_edges = 0
+        for i in range(4):
+            pt1 = box[i]
+            pt2 = box[(i+1)%4]
+            dx = pt2[0] - pt1[0]
+            dy = pt2[1] - pt1[1]
+            angle = np.degrees(np.arctan2(dy, dx))
+            if abs(angle) < 5 or abs(abs(angle)-180) < 5:
+                flat_edges += 1
+
+        # Color histograms along edges
+        edge_histograms = []
+        for i in range(4):
+            pt1 = box[i]
+            pt2 = box[(i+1)%4]
+            line_x = np.linspace(pt1[0], pt2[0], num=10).astype(int)
+            line_y = np.linspace(pt1[1], pt2[1], num=10).astype(int)
+            colors = img_rgb[line_y, line_x, :]
+            hist_r = np.histogram(colors[:,0], bins=8, range=(0,255))[0]
+            hist_g = np.histogram(colors[:,1], bins=8, range=(0,255))[0]
+            hist_b = np.histogram(colors[:,2], bins=8, range=(0,255))[0]
+            hist = np.concatenate([hist_r, hist_g, hist_b])
+            hist = hist / (hist.sum() + 1e-6)
+            edge_histograms.append(hist)
+
+        features[img_path.stem] = {
+            "contour": contour,
+            "approx_poly": approx,
+            "box": box,
+            "flat_edges": flat_edges,
+            "edge_histograms": edge_histograms,
+            "mask": mask_bin,
+        }
+
+    print(f"✓ Extracted features for {len(features)} pieces.")
     return features
 
-def build_adjacency_graph(features: Dict[str, dict], output_path: str):
-    """Construct adjacency graph from extracted features."""
+def build_graph(features: Dict[str, dict], output_graph_dir: str, top_k=3, mutual_only=True) -> Dict[str, List[str]]:
+    """
+    Build adjacency graph based on edge histogram similarity.
+    Optionally keep only mutual edges.
+    Returns: graph dict, list of edge pieces
+    """
     print("Building adjacency graph...")
-    # TODO: Compare features between pieces, compute similarity, threshold
     graph = {}
-    # Example:
-    # graph = compute_graph(features)
-    with open(output_path, 'w') as f:
-        json.dump(graph, f, indent=4)
-    print(f"Adjacency graph saved to {output_path}")
+    piece_ids = list(features.keys())
+
+    for pid in piece_ids:
+        current = features[pid]
+        scores = []
+        for other_pid in piece_ids:
+            if other_pid == pid:
+                continue
+            other = features[other_pid]
+
+            # min distance between any pair of edges
+            min_dist = np.inf
+            for h1 in current['edge_histograms']:
+                for h2 in other['edge_histograms']:
+                    dist = np.linalg.norm(h1 - h2)
+                    if dist < min_dist:
+                        min_dist = dist
+            scores.append((min_dist, other_pid))
+
+        # keep top_k neighbors
+        scores.sort(key=lambda x: x[0])
+        graph[pid] = [pid2 for _, pid2 in scores[:top_k]]
+
+    # Mutual filtering
+    if mutual_only:
+        mutual_graph = {}
+        for pid, neighbors in graph.items():
+            mutual_neighbors = [n for n in neighbors if pid in graph[n]]
+            mutual_graph[pid] = mutual_neighbors
+        graph = mutual_graph
+
+    # Edge pieces (pieces with at least one flat edge)
+    edge_pieces = [pid for pid, f in features.items() if f['flat_edges'] >= 1]
+
+    print(f"✓ Graph built with {len(graph)} nodes, {len(edge_pieces)} edge pieces identified.")
+
+    # Plot graph
+    G = nx.Graph()
+    for node, neighbors in graph.items():
+        for n in neighbors:
+            G.add_edge(node, n)
+
+    plt.figure(figsize=(12, 12))
+    pos = nx.spring_layout(G, seed=42)
+    node_colors = ['red' if n in edge_pieces else 'skyblue' for n in G.nodes()]
+    nx.draw(G, pos, with_labels=True, node_color=node_colors, node_size=300, font_size=8)
+    plt.title("Puzzle Adjacency Graph (Red = Edge Pieces)")
+    plt.savefig(output_graph_dir / "graph.png", dpi=150, bbox_inches='tight')
+    plt.show()
+
+    # Save adjacency graph as JSON
+    with open(output_graph_dir / "graph.json", "w") as f:
+        json.dump(graph, f, indent=2)
+
+    print(f"✓ Graph visualization saved as 'graph.png' and adjacency saved as 'graph.json'.")
 
 def assemble_puzzle(graph_path: str, features: Dict[str, dict], output_path: str):
     """Assemble puzzle based on graph and geometric relationships."""
@@ -130,19 +253,20 @@ def assemble_puzzle(graph_path: str, features: Dict[str, dict], output_path: str
     print(f"Puzzle assembly complete. Saved to {output_path}")
 
 def main(args):
-    image_dir = Path(args.images)
-    mask_dir = Path(args.output_masks)
-    graph_path = Path(args.output_graph)
-    assembled_path = Path(args.output_final)
+    image_dir = Path(args.images_dir)
+    provided_masks_dir = Path(args.provided_masks_dir)
+    predicted_masks_dir = Path(args.predicted_masks_dir)
+    output_graph_dir = Path(args.output_graph_dir)
+    assembled_path = Path(args.output_final_path)
 
     print("[STEP 1] Predicting segmentation masks...")
-    predict_masks(args.model, image_dir, mask_dir)
+    predict_masks(args.model_path, image_dir, provided_masks_dir, predicted_masks_dir)
 
-    # print("[STEP 2] Extracting features...")
-    # features = extract_features(image_dir, mask_dir)
+    print("[STEP 2] Extracting features...")
+    features = extract_features(image_dir, provided_masks_dir, predicted_masks_dir)
 
-    # print("[STEP 3] Building adjacency graph...")
-    # build_adjacency_graph(features, graph_path)
+    print("[STEP 3] Building adjacency graph...")
+    build_graph(features, output_graph_dir, top_k=3, mutual_only=True)
 
     # print("[STEP 4] Assembling final puzzle...")
     # assemble_puzzle(graph_path, features, assembled_path)
@@ -152,19 +276,22 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run end-to-end puzzle reconstruction experiment.")
     
-    parser.add_argument("--model", type=str, default="./output/training/deeplabv3plus_resnet50_best.pth",
+    parser.add_argument("--model_path", type=str, default="./output/training/deeplabv3plus_resnet50_best.pth",
                         help="Path to the trained segmentation model.")
     
-    parser.add_argument("--images", type=str, default="./data/images/",
+    parser.add_argument("--images_dir", type=str, default="./data/images/",
                         help="Directory containing puzzle piece images.")
     
-    parser.add_argument("--output_masks", type=str, default="./output/predicted_masks",
+    parser.add_argument("--predicted_masks_dir", type=str, default="./output/predicted_masks/",
                         help="Output directory for predicted masks.")
     
-    parser.add_argument("--output_graph", type=str, default="./output/graph.json",
-                        help="Output path for adjacency graph JSON.")
+    parser.add_argument("--provided_masks_dir", type=str, default="./data/masks/",
+                        help="Directory containing provided masks")
     
-    parser.add_argument("--output_final", type=str, default="./output/final_puzzle.png",
+    parser.add_argument("--output_graph_dir", type=str, default="./output/",
+                        help="Output directory for adjacency graph.")
+    
+    parser.add_argument("--output_final_path", type=str, default="./output/final_puzzle.png",
                         help="Output path for final assembled puzzle image.")
 
     args = parser.parse_args()
