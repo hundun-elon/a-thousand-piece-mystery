@@ -219,6 +219,8 @@ def validate_epoch(model, loader, criterion, device):
 
 def main():
     ### W&B SETUP ###
+    config = Config()
+
     wandb.init(
         project="puzzle-segmentation",
         config={k: v for k, v in config.__dict__.items() if not k.startswith("__")}
