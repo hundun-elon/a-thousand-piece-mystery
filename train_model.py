@@ -144,19 +144,16 @@ def get_train_transform(img_size):
         A.RandomGamma(gamma_limit=(70, 130), p=0.3),
         
         # Color
-        A.HueSaturationValue(
-            hue_shift_limit=15,
-            sat_shift_limit=25,
-            val_shift_limit=20,
-            p=0.4
-        ),
         A.ColorJitter(
             brightness=0.2,
             contrast=0.2,
             saturation=0.2,
             hue=0.1,
             p=0.3
-        )
+        ),
+        
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
     ])
 
 def get_val_transform(img_size):
