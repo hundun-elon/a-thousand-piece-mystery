@@ -22,3 +22,6 @@ output/
 
 # IDE
 .vscode/
+
+logs/
+wandb/
