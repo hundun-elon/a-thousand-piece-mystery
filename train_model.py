@@ -23,7 +23,7 @@ class Config:
     NUM_CLASSES = 1  # Binary segmentation (piece vs background)
     
     # Data
-    IMG_SIZE = (512, 512)  # Resize images to this size
+    IMG_SIZE = (1024, 1024)  # Resize images to this size
     BATCH_SIZE = 16
     NUM_WORKERS = 8
     
@@ -353,7 +353,7 @@ def main():
 
     best_val_iou = 0.0
     patience_counter = 0
-    early_stop_patience = 10
+    early_stop_patience = 100
 
     for epoch in range(config.EPOCHS):
         print(f"\nEpoch {epoch+1}/{config.EPOCHS}")
