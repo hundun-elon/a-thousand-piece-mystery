@@ -23,7 +23,7 @@ class Config:
     NUM_CLASSES = 1  # Binary segmentation (piece vs background)
     
     # Data
-    IMG_SIZE = (1024, 1024)  # Resize images to this size
+    IMG_SIZE = (512, 512)  # Resize images to this size
     BATCH_SIZE = 16
     NUM_WORKERS = 8
     
@@ -310,7 +310,8 @@ def main():
         encoder_name=config.BACKBONE,
         encoder_weights="imagenet",
         in_channels=config.IN_CHANNELS,
-        classes=config.NUM_CLASSES
+        classes=config.NUM_CLASSES,
+        encoder_output_stride=8
     ).to(device)
 
     print(f"Model created: DeepLabV3+ with {config.BACKBONE} backbone")
@@ -331,7 +332,7 @@ def main():
         optimizer,
         mode='max',
         factor=0.5,
-        patience=5
+        patience=7
     )
 
     print("Optimizer: AdamW")
