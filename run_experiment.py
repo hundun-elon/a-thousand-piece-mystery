@@ -362,7 +362,6 @@ def extract_features(image_dir: str, provided_masks_dir: str, predicted_masks_di
     
     return features
 
-
 def build_graph(features: Dict[str, dict], output_graph_dir: str):
     """
     Build adjacency graph by matching piece sides with constraints.
@@ -626,14 +625,14 @@ def main(args):
     output_graph_dir = Path(args.output_graph_dir)
     assembled_path = Path(args.output_final_path)
 
-    # print("[STEP 1] Predicting segmentation masks...")
-    # predict_masks(args.model_path, image_dir, provided_masks_dir, predicted_masks_dir)
+    print("[STEP 1] Predicting segmentation masks...")
+    predict_masks(args.model_path, image_dir, provided_masks_dir, predicted_masks_dir)
 
-    print("[STEP 2] Extracting features...")
-    features = extract_features(image_dir, provided_masks_dir, predicted_masks_dir)
+    # print("[STEP 2] Extracting features...")
+    # features = extract_features(image_dir, provided_masks_dir, predicted_masks_dir)
 
-    print("[STEP 3] Building adjacency graph...")
-    build_graph(features, output_graph_dir)
+    # print("[STEP 3] Building adjacency graph...")
+    # build_graph(features, output_graph_dir)
 
     # print("[STEP 4] Assembling final puzzle...")
     # assemble_puzzle(graph_path, features, assembled_path)
