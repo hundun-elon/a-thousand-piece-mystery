@@ -120,28 +120,22 @@ class CombinedLoss(nn.Module):
 def get_train_transform(img_size):
     """Balanced training data augmentation for puzzle piece segmentation"""
     return A.Compose([
+        # Resize
         A.Resize(height=img_size[0], width=img_size[1]),
 
-        # Geometric - puzzle pieces can be rotated/flipped arbitrarily
+        # Geometric
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=0.5),
         A.ShiftScaleRotate(
             shift_limit=0.1,
             scale_limit=0.15,
-            rotate_limit=180,  # Full rotation since puzzle pieces have no "up"
+            rotate_limit=180,
             border_mode=0,
             p=0.7
         ),
         
-        # Shadow/lighting
-        A.RandomShadow(
-            shadow_roi=(0, 0.5, 1, 1),  # Shadows from top
-            num_shadows_lower=1,
-            num_shadows_upper=2,
-            shadow_dimension=5,
-            p=0.4
-        ),
+        # Lighting
         A.RandomBrightnessContrast(
             brightness_limit=0.3,
             contrast_limit=0.3,
@@ -149,7 +143,7 @@ def get_train_transform(img_size):
         ),
         A.RandomGamma(gamma_limit=(70, 130), p=0.3),
         
-        # Color - different puzzle materials/lighting conditions
+        # Color
         A.HueSaturationValue(
             hue_shift_limit=15,
             sat_shift_limit=25,
@@ -162,21 +156,6 @@ def get_train_transform(img_size):
             saturation=0.2,
             hue=0.1,
             p=0.3
-        ),
-        
-        # Noise/blur - simulate camera quality variations
-        A.OneOf([
-            A.GaussNoise(var_limit=(10.0, 50.0), p=1.0),
-            A.GaussianBlur(blur_limit=(3, 5), p=1.0),
-            A.MotionBlur(blur_limit=5, p=1.0),
-        ], p=0.3),
-        
-        # Simulate different backgrounds
-        A.RandomFog(
-            fog_coef_lower=0.05,
-            fog_coef_upper=0.15,
-            alpha_coef=0.1,
-            p=0.1
         )
     ])
 
@@ -355,7 +334,8 @@ def main():
         encoder_name=config.BACKBONE,
         encoder_weights="imagenet",
         in_channels=config.IN_CHANNELS,
-        classes=config.NUM_CLASSES
+        classes=config.NUM_CLASSES,
+        encoder_output_stride=8
     ).to(device)
 
     print(f"Model created: DeepLabV3+ with {config.BACKBONE} backbone")
