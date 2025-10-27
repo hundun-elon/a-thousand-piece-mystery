@@ -28,7 +28,7 @@ class Config:
     NUM_WORKERS = 8
     
     # Training
-    EPOCHS = 400
+    EPOCHS = 200
     LEARNING_RATE = 1e-4
     WEIGHT_DECAY = 1e-4
     
@@ -121,36 +121,63 @@ def get_train_transform(img_size):
     """Balanced training data augmentation for puzzle piece segmentation"""
     return A.Compose([
         A.Resize(height=img_size[0], width=img_size[1]),
-        
-        # Core geometric transforms
+
+        # Geometric - puzzle pieces can be rotated/flipped arbitrarily
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        A.Rotate(limit=90, p=0.5, border_mode=0),  # Rotation
-        A.Affine(
-            translate_percent={"x": 0.1, "y": 0.1},
-            scale=(0.9, 1.1),
-            shear=(-5, 5),
-            p=0.4
+        A.RandomRotate90(p=0.5),
+        A.ShiftScaleRotate(
+            shift_limit=0.1,
+            scale_limit=0.15,
+            rotate_limit=180,  # Full rotation since puzzle pieces have no "up"
+            border_mode=0,
+            p=0.7
         ),
         
-        # Color augmentation
+        # Shadow/lighting
+        A.RandomShadow(
+            shadow_roi=(0, 0.5, 1, 1),  # Shadows from top
+            num_shadows_lower=1,
+            num_shadows_upper=2,
+            shadow_dimension=5,
+            p=0.4
+        ),
+        A.RandomBrightnessContrast(
+            brightness_limit=0.3,
+            contrast_limit=0.3,
+            p=0.5
+        ),
+        A.RandomGamma(gamma_limit=(70, 130), p=0.3),
+        
+        # Color - different puzzle materials/lighting conditions
+        A.HueSaturationValue(
+            hue_shift_limit=15,
+            sat_shift_limit=25,
+            val_shift_limit=20,
+            p=0.4
+        ),
         A.ColorJitter(
-            brightness=0.15, 
-            contrast=0.15, 
-            saturation=0.15, 
-            hue=0.05, 
-            p=0.4
+            brightness=0.2,
+            contrast=0.2,
+            saturation=0.2,
+            hue=0.1,
+            p=0.3
         ),
         
-        # Light blur (helps generalization)
+        # Noise/blur - simulate camera quality variations
         A.OneOf([
-            A.GaussianBlur(blur_limit=(3, 3), p=1.0),
-            A.MotionBlur(blur_limit=3, p=1.0),
-        ], p=0.2),
+            A.GaussNoise(var_limit=(10.0, 50.0), p=1.0),
+            A.GaussianBlur(blur_limit=(3, 5), p=1.0),
+            A.MotionBlur(blur_limit=5, p=1.0),
+        ], p=0.3),
         
-        # Normalize for pretrained encoder
-        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        ToTensorV2(),
+        # Simulate different backgrounds
+        A.RandomFog(
+            fog_coef_lower=0.05,
+            fog_coef_upper=0.15,
+            alpha_coef=0.1,
+            p=0.1
+        )
     ])
 
 def get_val_transform(img_size):
@@ -328,7 +355,7 @@ def main():
         encoder_name=config.BACKBONE,
         encoder_weights="imagenet",
         in_channels=config.IN_CHANNELS,
-        classes=config.NUM_CLASSES,
+        classes=config.NUM_CLASSES
     ).to(device)
 
     print(f"Model created: DeepLabV3+ with {config.BACKBONE} backbone")
