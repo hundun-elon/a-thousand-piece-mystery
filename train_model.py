@@ -380,7 +380,17 @@ def main():
         print(f"Train Loss: {train_loss:.4f} | Train IoU: {train_iou:.4f}")
         print(f"Val Loss: {val_loss:.4f} | Val IoU: {val_iou:.4f}")
         print(f"Learning Rate: {current_lr:.6f}")
-        
+
+        # Log to W&B
+        wandb.log({
+            "epoch": epoch + 1,
+            "train_loss": train_loss,
+            "train_iou": train_iou,
+            "val_loss": val_loss,
+            "val_iou": val_iou,
+            "learning_rate": current_lr
+        })
+
         # Save best model
         if val_iou > best_val_iou:
             best_val_iou = val_iou
