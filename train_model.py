@@ -23,12 +23,12 @@ class Config:
     NUM_CLASSES = 1  # Binary segmentation (piece vs background)
     
     # Data
-    IMG_SIZE = (512, 512)  # Resize images to this size
+    IMG_SIZE = (256, 256)  # Resize images to this size
     BATCH_SIZE = 16
     NUM_WORKERS = 8
     
     # Training
-    EPOCHS = 200
+    EPOCHS = 400
     LEARNING_RATE = 1e-4
     WEIGHT_DECAY = 1e-4
     
