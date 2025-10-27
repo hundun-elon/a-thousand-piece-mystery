@@ -118,18 +118,36 @@ class CombinedLoss(nn.Module):
         return self.bce(pred, target) + self.dice(pred, target)
 
 def get_train_transform(img_size):
-    """Training data augmentation"""
+    """Balanced training data augmentation for puzzle piece segmentation"""
     return A.Compose([
         A.Resize(height=img_size[0], width=img_size[1]),
+        
+        # Core geometric transforms
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        # Small rotations, translations, and scaling
+        A.Rotate(limit=90, p=0.5, border_mode=0),  # Rotation
         A.Affine(
             translate_percent={"x": 0.1, "y": 0.1},
-            rotate=(-15, 15),
-            scale=(0.9, 1.1),  # uniform scaling
-            p=0.5
+            scale=(0.9, 1.1),
+            shear=(-5, 5),
+            p=0.4
         ),
+        
+        # Color augmentation
+        A.ColorJitter(
+            brightness=0.15, 
+            contrast=0.15, 
+            saturation=0.15, 
+            hue=0.05, 
+            p=0.4
+        ),
+        
+        # Light blur (helps generalization)
+        A.OneOf([
+            A.GaussianBlur(blur_limit=(3, 3), p=1.0),
+            A.MotionBlur(blur_limit=3, p=1.0),
+        ], p=0.2),
+        
         # Normalize for pretrained encoder
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
@@ -311,7 +329,6 @@ def main():
         encoder_weights="imagenet",
         in_channels=config.IN_CHANNELS,
         classes=config.NUM_CLASSES,
-        encoder_output_stride=8
     ).to(device)
 
     print(f"Model created: DeepLabV3+ with {config.BACKBONE} backbone")
