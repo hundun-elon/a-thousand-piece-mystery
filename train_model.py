@@ -221,7 +221,6 @@ def main():
     ### W&B SETUP ###
     wandb.init(
         project="puzzle-segmentation",
-        name=f"deeplabv3plus_{config.BACKBONE}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         config={k: v for k, v in config.__dict__.items() if not k.startswith("__")}
     )
 
