@@ -237,7 +237,6 @@ def main():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
 
     ### CONFIG ###
-    config = Config()
 
     print("\n" + "="*70)
     print("CONFIGURATION")
