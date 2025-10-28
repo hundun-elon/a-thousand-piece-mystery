@@ -332,7 +332,6 @@ def main():
         encoder_weights="imagenet",
         in_channels=config.IN_CHANNELS,
         classes=config.NUM_CLASSES,
-        encoder_output_stride=8
     ).to(device)
 
     print(f"Model created: DeepLabV3+ with {config.BACKBONE} backbone")
