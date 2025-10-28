@@ -17,8 +17,8 @@ import wandb
 class Config:
     """Training configuration"""
     # Model
-    MODEL_NAME = "deeplabv3plus"
-    BACKBONE = "resnet50"
+    MODEL_NAME = "unet"
+    BACKBONE = "efficientnet-b4"
     IN_CHANNELS = 3
     NUM_CLASSES = 1  # Binary segmentation (piece vs background)
     
@@ -242,8 +242,11 @@ def main():
     ### W&B SETUP ###
     config = Config()
 
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     wandb.init(
         project="puzzle-segmentation",
+        name=f"{config.MODEL_NAME}_{config.BACKBONE}_{timestamp}",
         config={k: v for k, v in config.__dict__.items() if not k.startswith("__")}
     )
 
@@ -327,14 +330,14 @@ def main():
     print("="*70)
 
     # Create model
-    model = smp.DeepLabV3Plus(
+    model = smp.Unet(
         encoder_name=config.BACKBONE,
         encoder_weights="imagenet",
         in_channels=config.IN_CHANNELS,
         classes=config.NUM_CLASSES,
     ).to(device)
 
-    print(f"Model created: DeepLabV3+ with {config.BACKBONE} backbone")
+    print(f"Model created: UNet with {config.BACKBONE} backbone")
     print(f"Encoder initialized with ImageNet weights")
 
     # Initialize loss
@@ -417,7 +420,7 @@ def main():
             best_val_iou = val_iou
             patience_counter = 0
             
-            model_save_path = Path(config.MODEL_DIR) / f"deeplabv3plus_resnet50_best.pth"
+            model_save_path = Path(config.MODEL_DIR) / f"{config.MODEL_NAME}_{config.BACKBONE}_best.pth"
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
@@ -476,7 +479,7 @@ def main():
     axes[2].grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(f"{config.OUTPUT_DIR}/deeplabv3plus_resnet50_training_history.png", dpi=150, bbox_inches='tight')
+    plt.savefig(f"{config.OUTPUT_DIR}/{config.MODEL_NAME}_{config.BACKBONE}_training_history.png", dpi=150, bbox_inches='tight')
     # plt.show()
 
     print("✓ Training history plots saved")
@@ -487,7 +490,7 @@ def main():
     print("="*70)
 
     # Load best model
-    checkpoint = torch.load(Path(config.MODEL_DIR) / "deeplabv3plus_resnet50_best.pth")
+    checkpoint = torch.load(Path(config.MODEL_DIR) / f"{config.MODEL_NAME}_{config.BACKBONE}_best.pth")
     model.load_state_dict(checkpoint['model_state_dict'])
     print("✓ Loaded best model weights")
 
@@ -517,7 +520,7 @@ def main():
         'history': {k: [float(v) for v in vals] for k, vals in history.items()}
     }
 
-    results_path = Path(config.OUTPUT_DIR) / "deeplabv3plus_resnet50_results.json"
+    results_path = Path(config.OUTPUT_DIR) / f"{config.MODEL_NAME}_{config.BACKBONE}results.json"
     with open(results_path, 'w') as f:
         json.dump(results, f, indent=2)
 
