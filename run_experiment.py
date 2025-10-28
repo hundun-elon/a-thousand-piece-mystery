@@ -23,7 +23,7 @@ import cv2
 import matplotlib.pyplot as plt
 import networkx as nx
 
-def predict_masks(model_path: str, image_dir: str, provided_masks_dir: str, predicted_masks_dir: str, input_size=(256, 256)):
+def predict_masks(model_path: str, image_dir: str, provided_masks_dir: str, predicted_masks_dir: str, input_size=(512, 512)):
     """
     Predict binary masks for unlabeled images using the trained model.
 
@@ -642,7 +642,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run end-to-end puzzle reconstruction experiment.")
     
-    parser.add_argument("--model_path", type=str, default="./output/training/unet_efficientnet-b4_best.pth",
+    parser.add_argument("--model_path", type=str, default="./output/training/unet_20251028_184208/unet_efficientnet-b4_best.pth",
                         help="Path to the trained segmentation model.")
     
     parser.add_argument("--images_dir", type=str, default="./data/images/",
