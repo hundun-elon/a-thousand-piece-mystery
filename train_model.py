@@ -23,7 +23,7 @@ class Config:
     NUM_CLASSES = 1  # Binary segmentation (piece vs background)
     
     # Data
-    IMG_SIZE = (256, 256)  # Resize images to this size
+    IMG_SIZE = (512, 512)  # Resize images to this size
     BATCH_SIZE = 16
     NUM_WORKERS = 8
     
@@ -40,9 +40,12 @@ class Config:
     TEST_IMG_DIR = "./data/test/images"
     TEST_MASK_DIR = "./data/test/masks"
     
-    # Output paths
-    MODEL_DIR = "./output/training"
-    OUTPUT_DIR = "./output/training"
+    # Timestamp
+    TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Output paths with timestamp
+    MODEL_DIR = f"./output/training/{MODEL_NAME}_{TIMESTAMP}"
+    OUTPUT_DIR = f"./output/training/{MODEL_NAME}_{TIMESTAMP}"
     
     # Create directories
     Path(MODEL_DIR).mkdir(parents=True, exist_ok=True)

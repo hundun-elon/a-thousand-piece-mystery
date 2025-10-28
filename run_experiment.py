@@ -23,7 +23,7 @@ import cv2
 import matplotlib.pyplot as plt
 import networkx as nx
 
-def predict_masks(model_path: str, image_dir: str, provided_masks_dir: str, predicted_masks_dir: str, input_size=(256, 256)):
+def predict_masks(model_path: str, image_dir: str, provided_masks_dir: str, predicted_masks_dir: str, input_size=(512, 512)):
     """
     Predict binary masks for unlabeled images using the trained model.
 
@@ -37,8 +37,8 @@ def predict_masks(model_path: str, image_dir: str, provided_masks_dir: str, pred
     print("Loading trained model...")
 
     # Initialize model
-    model = smp.DeepLabV3Plus(
-        encoder_name="resnet50",
+    model = smp.Unet(
+        encoder_name="efficientnet-b4",
         encoder_weights=None,
         in_channels=3,
         classes=1,
@@ -642,7 +642,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run end-to-end puzzle reconstruction experiment.")
     
-    parser.add_argument("--model_path", type=str, default="./output/training/deeplabv3plus_resnet50_best.pth",
+    parser.add_argument("--model_path", type=str, default="./output/training/unet_efficientnet-b4_best.pth",
                         help="Path to the trained segmentation model.")
     
     parser.add_argument("--images_dir", type=str, default="./data/images/",
