@@ -23,7 +23,7 @@ import cv2
 import matplotlib.pyplot as plt
 import networkx as nx
 
-def predict_masks(model_path: str, image_dir: str, provided_masks_dir: str, predicted_masks_dir: str, input_size=(512, 512)):
+def predict_masks(model_path: str, image_dir: str, provided_masks_dir: str, predicted_masks_dir: str, input_size=(256, 256)):
     """
     Predict binary masks for unlabeled images using the trained model.
 
