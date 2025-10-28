@@ -24,7 +24,7 @@ class Config:
     
     # Data
     IMG_SIZE = (512, 512)  # Resize images to this size
-    BATCH_SIZE = 16
+    BATCH_SIZE = 8
     NUM_WORKERS = 8
     
     # Training
