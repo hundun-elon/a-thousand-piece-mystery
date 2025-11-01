@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
-def match_sides_with_knn(geom_features, color_features, n_neighbors=1, scale=True):
+def _match_sides_with_knn(geom_features, color_features, n_neighbors=1, scale=True):
     # --- Step 1. Create rotated/reversed sides ---
     rotated_sides = (geom_features * (-1, -1))[:, ::-1, :]
 
@@ -30,7 +30,7 @@ def match_sides_with_knn(geom_features, color_features, n_neighbors=1, scale=Tru
 
     return distances, indices
 
-def get_valid_matches(distances, indices, side_indices, max_distance=0.5):
+def _get_valid_matches(distances, indices, side_indices, max_distance=0.5):
     valid_matches = []
     
     for query_idx in range(len(distances)):
@@ -53,12 +53,12 @@ def run_side_matching(normalized_sides, color_features, side_indices, n_neighbor
     print(f"Matching {len(normalized_sides)} sides using KNN...")
 
     # Step 1. Perform matching
-    distances, indices = match_sides_with_knn(
+    distances, indices = _match_sides_with_knn(
         normalized_sides, color_features, n_neighbors=n_neighbors, scale=scale
     )
 
     # Step 2. Filter valid matches
-    valid_matches = get_valid_matches(distances, indices, side_indices, max_distance=max_distance)
+    valid_matches = _get_valid_matches(distances, indices, side_indices, max_distance=max_distance)
 
     print(f"Found {len(valid_matches)} valid matches.")
 
